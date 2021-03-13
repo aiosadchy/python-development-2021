@@ -144,4 +144,4 @@ class GameOfFifteenWidget(tk.Frame):
 
 
 if __name__ == '__main__':
-    GameOfFifteenWidget(GameOfFifteen(3, 7, complexity=50), master=tk.Tk()).mainloop()
+    GameOfFifteenWidget(GameOfFifteen(4, 4, complexity=50), master=tk.Tk()).mainloop()
