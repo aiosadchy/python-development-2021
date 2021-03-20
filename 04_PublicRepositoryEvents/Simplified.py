@@ -1,11 +1,38 @@
 import tkinter as tk
-from tkinter.messagebox import showinfo
 from functools import partial
+from tkinter.messagebox import showinfo
+from tkinter.constants import *
+import re
+
+
+def parse_geometry(geometry):
+    groups = re.match(
+        r"(?P<row>\d+)"
+        r"(\.(?P<row_weight>\d+))?"
+        r"(\+(?P<height>\d+))?"
+        r":"
+        r"(?P<col>\d+)"
+        r"(\.(?P<col_weight>\d+))?"
+        r"(\+(?P<width>\d+))?"
+        r"(/(?P<gravity>[NEWS]+))?",
+        geometry
+    ).groupdict()
+    names = [
+        ("row",         int,   None),
+        ("row_weight",  int,      1),
+        ("height",      int,      0),
+        ("col",         int,   None),
+        ("col_weight",  int,      1),
+        ("width",       int,      0),
+        ("gravity",     str, "NEWS")
+    ]
+    return ((c(groups[g]) if groups[g] is not None else d) for g, c, d in names)
 
 
 class Application(tk.Frame):
     def __init__(self, title):
         super().__init__()
+        self.pack(expand=True, fill=BOTH)
         self.createWidgets()
         self.winfo_toplevel().title(title)
 
@@ -14,16 +41,27 @@ class Application(tk.Frame):
 
     @staticmethod
     def __construct(parent, name, widget_type, geometry, **kwargs):
-        constructor = parent.__construct
-
         class ChildWidget(widget_type):
-            def __getattr__(self, item):
-                return partial(constructor, self, item)
+            def __init__(self, constructor, geometry, *args, **kwargs):
+                super(ChildWidget, self).__init__(*args, **kwargs)
+                self.__construct = constructor
 
-        print(widget_type, geometry, kwargs)
-        result = ChildWidget(parent.master, **kwargs)
-        setattr(parent, name, result)
-        return result
+                row, row_weight, height, col, col_weight, width, gravity = parse_geometry(geometry)
+                self.grid(
+                    row=row,
+                    rowspan=(height + 1),
+                    column=col,
+                    columnspan=(width + 1),
+                    sticky=gravity
+                )
+                self.master.rowconfigure(row, weight=row_weight)
+                self.master.columnconfigure(col, weight=col_weight)
+
+            def __getattr__(self, item):
+                return partial(self.__construct, self, item)
+
+        setattr(parent, name, ChildWidget(parent.__construct, geometry, master=parent, **kwargs))
+        return getattr(parent, name)
 
     def createWidgets(self):
         pass
