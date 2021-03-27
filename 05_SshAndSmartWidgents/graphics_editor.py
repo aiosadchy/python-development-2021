@@ -44,31 +44,41 @@ class GraphicsEditor(tk.Frame):
         self.__canvas.pack(expand=True, fill=BOTH)
 
         self.__filename = Filename("untitled.txt", self.__text_frame)
-        self.__new_figure = None
+        self.__NEW = "new"
+        self.__EDIT = "edit"
+        self.__current_shape = None
 
         # FIXME
         # self.master.resizable(False, False)
 
     def __on_click(self, event):
         x0, y0, x1, y1 = event.x, event.y, event.x, event.y
-        oval = self.__canvas.create_oval(x0, y0, x1, y1)
-        self.__new_figure = (x0, y0, oval)
+        overlapping = self.__canvas.find_overlapping(x0, y0, x1, y1)
+        if len(overlapping) == 0:
+            shape = self.__canvas.create_oval(x0, y0, x1, y1)
+            self.__current_shape = (self.__NEW, x0, y0, shape)
+        else:
+            self.__current_shape = (self.__EDIT, x0, y0, overlapping[-1])
 
     def __on_drag(self, event):
-        x_event, y_event = event.x, event.y
-        if self.__new_figure is None:
+        if self.__current_shape is None:
             return
-        x_origin, y_origin, figure = self.__new_figure
-        x0, y0, x1, y1 = self.__canvas.coords(figure)
-        x1, y1 = x_event, y_event
-        if x_event < x_origin:
-            x0, x1 = x_event, x_origin
-        if y_event < y_origin:
-            y0, y1 = y_event, y_origin
-        self.__canvas.coords(figure, x0, y0, x1, y1)
+        x_event, y_event = event.x, event.y
+        mode, x_origin, y_origin, shape = self.__current_shape
+        if mode == self.__NEW:
+            x0, y0, x1, y1 = self.__canvas.coords(shape)
+            x1, y1 = x_event, y_event
+            if x_event < x_origin:
+                x0, x1 = x_event, x_origin
+            if y_event < y_origin:
+                y0, y1 = y_event, y_origin
+            self.__canvas.coords(shape, x0, y0, x1, y1)
+        else:
+            self.__canvas.move(shape, x_event - x_origin, y_event - y_origin)
+            self.__current_shape = (self.__EDIT, x_event, y_event, shape)
 
     def __on_release(self, _):
-        self.__new_figure = None
+        self.__current_shape = None
 
 
 if __name__ == "__main__":
