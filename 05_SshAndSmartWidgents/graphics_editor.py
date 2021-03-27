@@ -4,7 +4,7 @@ from tkinter.constants import *
 
 
 # tk.StringVar does not work for some reason, so I use this as a workaround
-class Filename:
+class DynamicValue:
     def __init__(self, value, *labels):
         self.__value = value
         self.__labels = list(labels)
@@ -32,6 +32,17 @@ class GraphicsEditor(tk.Frame):
         self.__text = tk.Text(master=self.__text_frame)
 
         self.__editor_frame = tk.Frame(master=self)
+        self.__control_panel = tk.Frame(master=self.__editor_frame)
+        self.__fill_color_button = tk.Button(
+            master=self.__control_panel,
+            text="Fill color",
+            command=self.__pick_fill_color
+        )
+        self.__outline_color_button = tk.Button(
+            master=self.__control_panel,
+            text="Outline color",
+            command=self.__pick_outline_color
+        )
         self.__canvas = tk.Canvas(master=self.__editor_frame, height=512, width=512)
         self.__canvas.bind("<Button-1>", self.__on_click)
         self.__canvas.bind("<ButtonRelease-1>", self.__on_release)
@@ -41,12 +52,19 @@ class GraphicsEditor(tk.Frame):
         self.__text_frame.pack(side=LEFT, expand=True, fill=BOTH)
         self.__text.pack(expand=True, fill=BOTH)
         self.__editor_frame.pack(side=RIGHT, expand=True, fill=BOTH)
+        self.__control_panel.pack(side=TOP, expand=True, fill=X)
+        self.__fill_color_button.pack(side=LEFT, expand=False)
+        self.__outline_color_button.pack(side=LEFT, expand=False)
         self.__canvas.pack(expand=True, fill=BOTH)
 
-        self.__filename = Filename("untitled.txt", self.__text_frame)
+        self.__filename = DynamicValue("untitled.txt", self.__text_frame)
+
         self.__NEW = "new"
         self.__EDIT = "edit"
         self.__current_shape = None
+
+        self.__fill_color = "white"
+        self.__outline_color = "black"
 
         # FIXME
         # self.master.resizable(False, False)
@@ -55,7 +73,11 @@ class GraphicsEditor(tk.Frame):
         x0, y0, x1, y1 = event.x, event.y, event.x, event.y
         overlapping = self.__canvas.find_overlapping(x0, y0, x1, y1)
         if len(overlapping) == 0:
-            shape = self.__canvas.create_oval(x0, y0, x1, y1)
+            shape = self.__canvas.create_oval(
+                x0, y0, x1, y1,
+                fill=self.__fill_color,
+                outline=self.__outline_color
+            )
             self.__current_shape = (self.__NEW, x0, y0, shape)
         else:
             self.__current_shape = (self.__EDIT, x0, y0, overlapping[-1])
@@ -79,6 +101,12 @@ class GraphicsEditor(tk.Frame):
 
     def __on_release(self, _):
         self.__current_shape = None
+
+    def __pick_fill_color(self):
+        self.__fill_color = tk.colorchooser.askcolor(color=self.__fill_color)[-1]
+
+    def __pick_outline_color(self):
+        self.__outline_color = tk.colorchooser.askcolor(color=self.__outline_color)[-1]
 
 
 if __name__ == "__main__":
