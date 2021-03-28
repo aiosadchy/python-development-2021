@@ -8,37 +8,16 @@ object_description = re.compile(
     r"^"                                            r"[\s]*"
     r"(?P<type>oval)"                               r"[\s]*"
     r"<"                                            r"[\s]*"
-    r"(?P<x0>[+\-]?(\d+|\d+\.\d+))"                 r"[\s]*"
-    r"(?P<y0>[+\-]?(\d+|\d+\.\d+))"                 r"[\s]*"
-    r"(?P<x1>[+\-]?(\d+|\d+\.\d+))"                 r"[\s]*"
+    r"(?P<x0>[+\-]?(\d+|\d+\.\d+))"                 r"[\s]+"
+    r"(?P<y0>[+\-]?(\d+|\d+\.\d+))"                 r"[\s]+"
+    r"(?P<x1>[+\-]?(\d+|\d+\.\d+))"                 r"[\s]+"
     r"(?P<y1>[+\-]?(\d+|\d+\.\d+))"                 r"[\s]*"
     r">"                                            r"[\s]*"
-    r"(?P<outline_thickness>[+\-]?(\d+|\d+\.\d+))"  r"[\s]*"
-    r"(?P<outline_color>#?\w+)"                     r"[\s]*"
+    r"(?P<outline_thickness>[+\-]?(\d+|\d+\.\d+))"  r"[\s]+"
+    r"(?P<outline_color>#?\w+)"                     r"[\s]+"
     r"(?P<fill_color>#?\w+)"                        r"[\s]*"
     r"$"
 )
-
-
-# tk.StringVar does not work for some reason, so I use this as a workaround
-class DynamicValue:
-    def __init__(self, value, *labels):
-        self.__value = value
-        self.__labels = list(labels)
-        self.__update_labels()
-
-    @property
-    def value(self):
-        return self.__value
-
-    @value.setter
-    def value(self, new_value):
-        self.__value = new_value
-        self.__update_labels()
-
-    def __update_labels(self):
-        for label in self.__labels:
-            label.config(text=self.__value)
 
 
 class GraphicsEditor(tk.Frame):
@@ -46,7 +25,7 @@ class GraphicsEditor(tk.Frame):
         super().__init__(master=master)
 
         self.__text_frame = tk.LabelFrame(master=self)
-        self.__text = tk.Text(master=self.__text_frame)
+        self.__text = tk.Text(master=self.__text_frame, undo=True)
         self.__text.bind("<<Modified>>", self.__update_canvas)
 
         self.__editor_frame = tk.Frame(master=self)
@@ -75,11 +54,12 @@ class GraphicsEditor(tk.Frame):
         self.__outline_color_button.pack(side=LEFT, expand=False)
         self.__canvas.pack(expand=True, fill=BOTH)
 
-        self.__filename = DynamicValue("untitled.txt", self.__text_frame)
-
         self.__NEW = "new"
         self.__EDIT = "edit"
         self.__current_shape = None
+
+        self.__TAG_INCORRECT = "incorrect"
+        self.__text.tag_config(self.__TAG_INCORRECT, background="red")
 
         self.__fill_color = "white"
         self.__outline_color = "black"
@@ -126,18 +106,22 @@ class GraphicsEditor(tk.Frame):
 
     def __update_text(self):
         old_text = self.__text.get("1.0", END).split("\n")
-        incorrect_lines = [line for line in old_text if object_description.match(line) is None]
-        incorrect_lines = [line for line in incorrect_lines if line != ""]
+        incorrect_lines = [
+            line for line in old_text
+            if object_description.match(line) is None and line != ""
+        ]
         new_shapes = [self.__serialize(o) for o in self.__canvas.find_all()]
         new_text = "\n".join(new_shapes + incorrect_lines)
         self.__text.delete("1.0", END)
         self.__text.insert("1.0", new_text)
+        self.__mark_incorrect_lines()
 
     def __update_canvas(self, _):
         self.__canvas.delete(ALL)
         text = self.__text.get("1.0", END).split("\n")
         for line in text:
             self.__deserialize(line)
+        self.__mark_incorrect_lines()
         self.__text.edit_modified(False)
 
     def __serialize(self, shape):
@@ -157,17 +141,29 @@ class GraphicsEditor(tk.Frame):
         if match is None:
             return
         attributes = match.groupdict()
-        try:
-            self.winfo_rgb(attributes["fill_color"])
-            self.winfo_rgb(attributes["outline_color"])
-        except tk.TclError:
-            return
+
+        for color in ["fill_color", "outline_color"]:
+            try:
+                self.winfo_rgb(attributes[color])
+            except tk.TclError:
+                attributes[color] = "black"
+
         getattr(self.__canvas, f"create_{attributes['type']}")(
             attributes["x0"], attributes["y0"], attributes["x1"], attributes["y1"],
             width=attributes["outline_thickness"],
             outline=attributes["outline_color"],
             fill=attributes["fill_color"]
         )
+
+    def __mark_incorrect_lines(self):
+        self.__text.tag_remove(self.__TAG_INCORRECT, "1.0", END)
+        text = enumerate(self.__text.get("1.0", END).split("\n"))
+        incorrect_lines = [
+            i + 1 for i, line in text
+            if object_description.match(line) is None and line != ""
+        ]
+        for i in incorrect_lines:
+            self.__text.tag_add(self.__TAG_INCORRECT, f"{i}.0", f"{i}.end")
 
 
 if __name__ == "__main__":
